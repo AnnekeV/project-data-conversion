@@ -1,10 +1,7 @@
 # %% FUNCTIONS
 
-from calendar import day_abbr
 from datetime import datetime, timedelta
 from pathlib import Path
-from time import time
-from tracemalloc import start
 import ctd
 from matplotlib import dates
 import matplotlib.dates as mdates
@@ -12,12 +9,9 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import matplotlib.colors
 import pandas as pd
-from geopy import Point
 import numpy as np
-import seaborn as sns
 import plotly.express as px
 import plotly.graph_objects as go
-from scipy import stats
 
 plt.style.use("ggplot")
 pd.options.plotting.backend = "matplotlib"

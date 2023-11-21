@@ -4,11 +4,8 @@ This files analyses and combines monthly CTD files
 
 """
 # %%
-from datetime import datetime, timedelta
-from importlib.resources import path
+from datetime import datetime
 from pathlib import Path
-from re import X
-
 import cmocean
 import ctd
 import matplotlib.colors
@@ -21,25 +18,24 @@ import plotly.graph_objects as go
 from os import listdir
 import os.path
 import seaborn as sns
-import xarray as xr
 from geopy import Point
-
+from basic_station_data import stat_loc, find_distance_from_fjordmouth
+from sklearn.linear_model import LinearRegression
 
 plt.style.use("ggplot")
 pd.options.plotting.backend = "matplotlib"
 path_parent = Path.cwd().parent.parent
-path_intermediate_files = Path.cwd().parent.joinpath("intermediate_files")
+path_intermediate_files = Path.cwd().parent.joinpath("data", "temp")
 figpath = os.path.join(path_parent, "Figures")
 # %% Importing station data and combining it to a bigger datase
-from basic_station_data import stat_loc, dist_lat_lon, find_distance_from_fjordmouth
 
 all_years = pd.DataFrame()
 
 for year in ["2018", "2019"]:
-    path_data = os.path.join(path_parent, "data", "CTD", year)
+    path_data = os.path.join(path_parent, "Data", "CTD", year)
 
     # % manually importing station information
-    station_info = path_parent.joinpath(Path("data", "CTD", year, f"{year}.txt"))
+    station_info = path_parent.joinpath(Path("Data", "CTD", year, f"{year}.txt"))
     widths = [8, 5, 6, 5, 9, 5, 7, 12, 12, 7, 8, 1000]  # nr of characters
     stat = pd.read_fwf(
         rf"{station_info}",
@@ -124,7 +120,7 @@ for year in ["2018", "2019"]:
         for key in meta:
             down[key] = this_stat[key]
 
-        if plot_cast == True:
+        if plot_cast:
             fig, (ax1, ax2, ax3) = plt.subplots(1, 3, sharey=True)
             down.reset_index().plot(
                 x="Potential temperature [°C]",
@@ -208,7 +204,7 @@ df_monthly.to_csv(f"{path_intermediate_files}/monthly_18_19_gf10.csv")
 # %%
 
 fnames = []
-for fname in Path(os.path.join(path_parent, "data", "CTD")).rglob("*.cnv"):
+for fname in Path(os.path.join(path_parent, "Data", "CTD")).rglob("*.cnv"):
     fnames.append(str(fname))
 
 
@@ -698,6 +694,7 @@ fig.write_image(f"{figpath}/All profiles {var}.png")
 # fig.update_yaxes(range=[20,0])
 # fig.write_image(f"{figpath}/temp/All profiles {var} zoom.png")
 
+
 # fig.update_yaxes(range=[600,0])
 
 # fig.write_html(f"{figpath}/temp/All profiles.html")
@@ -771,7 +768,6 @@ fig.update_yaxes(range=[600, 0])
 fig.show()
 
 # %% d rho /d z
-from sklearn.linear_model import LinearRegression
 
 
 def lin_reg(X, Y):
@@ -798,6 +794,8 @@ for i in df_sorted.date.unique():
         df_sorted[df_sorted.date == i]
         .set_index("Pressure [dbar]")[530:550]
         .reset_index()
+
+
     )
     diff_monthly.date = pd.to_datetime(df_sorted["date"])
     X = diff_monthly["Pressure [dbar]"].values.reshape(
@@ -825,14 +823,14 @@ plt.title("Coefficient density change with depth drho/dz 350-deepest point")
 
 
 df_monthly = pd.read_csv(
-    f"{path_intermediate_files}/monthly_18_19_gf10.csv",
+    (f"{path_intermediate_files}/"
+     "monthly_18_19_gf10.csv"),
     index_col=0,
     parse_dates=["date"],
 )
 df_gf10 = df_monthly[(df_monthly["St."] == "GF10") & (df_monthly["Type"] == "CTD")]
-Z_1819 = df_gf10.drop_duplicates(["Pressure [dbar]", "date"], "first").pivot(
-    index="Pressure [dbar]", columns="date", values="sal"
-)
+Z_1819 = df_gf10.drop_duplicates(["Pressure [dbar]", "date"], "first") \
+    .pivot(index="Pressure [dbar]", columns="date", values="sal")
 
 # %% CONTOURPLOT IN PLOTLY ===============
 
