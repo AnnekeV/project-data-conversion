@@ -4,8 +4,6 @@ This files analyses and combines monthly CTD files
 
 """
 # %%
-from datetime import datetime, timedelta
-from importlib.resources import path
 from pathlib import Path
 from re import X
 
@@ -21,7 +19,6 @@ import plotly.graph_objects as go
 from os import listdir
 import os.path
 import seaborn as sns
-import xarray as xr
 from geopy import Point
 
 
