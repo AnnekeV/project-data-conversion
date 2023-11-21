@@ -27,7 +27,6 @@ from geopy import Point
 
 plt.style.use("ggplot")
 pd.options.plotting.backend = "matplotlib"
-path_parent = r"/Users/annek/Library/CloudStorage/OneDrive-SharedLibraries-NIOZ/PhD Anneke Vries - General"
 path_parent = Path.cwd().parent.parent
 path_intermediate_files = Path.cwd().parent.joinpath("intermediate_files")
 figpath = os.path.join(path_parent, "Figures")
@@ -37,10 +36,10 @@ from basic_station_data import stat_loc, dist_lat_lon, find_distance_from_fjordm
 all_years = pd.DataFrame()
 
 for year in ["2018", "2019"]:
-    path_data = os.path.join(path_parent, "Data", "CTD", year)
+    path_data = os.path.join(path_parent, "data", "CTD", year)
 
     # % manually importing station information
-    station_info = path_parent.joinpath(Path("Data", "CTD", year, f"{year}.txt"))
+    station_info = path_parent.joinpath(Path("data", "CTD", year, f"{year}.txt"))
     widths = [8, 5, 6, 5, 9, 5, 7, 12, 12, 7, 8, 1000]  # nr of characters
     stat = pd.read_fwf(
         rf"{station_info}",
@@ -209,7 +208,7 @@ df_monthly.to_csv(f"{path_intermediate_files}/monthly_18_19_gf10.csv")
 # %%
 
 fnames = []
-for fname in Path(os.path.join(path_parent, "Data", "CTD")).rglob("*.cnv"):
+for fname in Path(os.path.join(path_parent, "data", "CTD")).rglob("*.cnv"):
     fnames.append(str(fname))
 
 
