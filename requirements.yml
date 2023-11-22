@@ -1,18 +1,13 @@
 name: deep_water
-channels:
+channels: 
   - conda-forge
 dependencies:
-  - numpy
-  - scipy
-  - matplotlib
-  - xarray
-  - netcdf4
-  - cartopy
-  - metpy
-  - seaborn
-  - pandas
-  - ctd
-  - pathlib
-  - importlib
-  - geopy
-
+  - python==3.10
+  - xarray==2023.1.0
+  - netcdf4==1.6.2
+  - cartopy==0.21.1
+  - metpy==1.5.1
+  - ctd==1.4.4
+  - geopy==2.4.0
+  - seaborn==0.13.0
+  
