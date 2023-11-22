@@ -142,9 +142,9 @@ for year in ["2018", "2019"]:
         )
         up = up.rename(
             columns={
-                "potemp090C": "Potential temperature [°C]",
-                "sal00": "Salinity [PSU]",
-                "density00": "Density [kg/m3]",
+                "potemp090C": "Potential temperature",
+                "sal00": "Salinity",
+                "density00": "Density",
             }
         )
         metadata = cast._metadata
@@ -171,40 +171,7 @@ for year in ["2018", "2019"]:
         down = down.reset_index()
         all_thisyear = pd.concat([all_thisyear, down], axis="index")
 
-    # ==================
-    #  selecting GF10
-    # ==================
-    print(all_thisyear.columns)
 
-    GF10 = (
-        all_thisyear[all_thisyear["St."] == "GF10"]
-        .sort_values(["Name", "Pressure [dbar]"])
-        .reset_index(drop=True)
-    )
-
-    StGF10 = stat[stat["St."] == "GF10"]["Name"].values
-    for i in range(len(StGF10)):
-        down = all_thisyear[all_thisyear["Name"] == StGF10[i]]
-
-    # Single year
-    df10 = all_thisyear[all_thisyear["Name"].isin(StGF10)]
-    column_rename = {
-        "potemp090C": "temp",
-        "sal00": "sal",
-        "density00": "dens",
-        "timeJV2": "time",
-        "timeJ": "time",
-        "sigma-t00": "sigma-dens",
-        "sigma-È00": "sigma-dens",
-        "sigma-�00": "sigma-dens",
-        "Date": "date",
-        "Potential temperature [°C]": "temp",
-        "Salinity [PSU]": "sal",
-        "Density [kg/m3]": "dens",
-    }
-    df10.rename(columns=column_rename).reset_index().to_csv(
-        f"{path_intermediate_files}/monthly_{year}_gf10.csv"
-    )
 
     # ==================
     #  All stations all years
@@ -230,11 +197,20 @@ df_monthly["id"] = df_monthly["Name"].copy()
 # Assign attributes and convert to xarray
 # =================================
 ds_single = down.set_index("Pressure [dbar]").to_xarray()
+# only keep variables  Potential temperature [°C] and Salinity [PSU] and Density [kg/m3]
+ds_single = ds_single[["Potential temperature [°C]", "Salinity [PSU]", "Density [kg/m3]"]]
+
 # set attributes
 time_coverage_start = datetime.strptime(
     metadata["config"]["start_time"].split("[")[0].strip(), "%b %d %Y %H:%M:%S"
 ).strftime("%Y-%m-%d %H:%M:%S")
 
+
+
 # assign attributes to ds_single
 ds_single.attrs["time_coverage_start"] = time_coverage_start
 
+ds_single.to_netcdf(f"{path_intermediate_files_netcdf}/test.nc")
+
+
+# %%
