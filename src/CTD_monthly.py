@@ -6,6 +6,7 @@ This files analyses and combines monthly CTD files
 # %%
 from datetime import datetime
 from pathlib import Path
+import pathlib
 import matplotlib.pyplot as plt
 import pandas as pd
 from os import listdir
@@ -20,7 +21,7 @@ importlib.reload(functions)
 # define paths
 plt.style.use("ggplot")
 pd.options.plotting.backend = "matplotlib"
-path_parent = Path.cwd().parent
+path_parent = pathlib.Path(__file__).parent.parent.resolve()
 path_intermediate_files = Path.cwd().parent.joinpath("data", "temp")
 path_intermediate_files_netcdf = path_intermediate_files.joinpath("netcdf")
 figpath = os.path.join(path_parent, "Figures")
@@ -135,18 +136,12 @@ for year in ["2018", "2019"]:
         down, up = cast.split()
         down = down.rename(
             columns={
-                "potemp090C": "Potential temperature [°C]",
-                "sal00": "Salinity [PSU]",
-                "density00": "Density [kg/m3]",
-            }
-        )
-        up = up.rename(
-            columns={
                 "potemp090C": "Potential temperature",
                 "sal00": "Salinity",
                 "density00": "Density",
             }
         )
+        
         metadata = cast._metadata
 
         if not metadata["name"] in stat.index:
@@ -197,8 +192,7 @@ df_monthly["id"] = df_monthly["Name"].copy()
 # Assign attributes and convert to xarray
 # =================================
 ds_single = down.set_index("Pressure [dbar]").to_xarray()
-# only keep variables  Potential temperature [°C] and Salinity [PSU] and Density [kg/m3]
-ds_single = ds_single[["Potential temperature [°C]", "Salinity [PSU]", "Density [kg/m3]"]]
+ds_single = ds_single[["Potential temperature", "Salinity", "Density"]]
 
 # set attributes
 time_coverage_start = datetime.strptime(
