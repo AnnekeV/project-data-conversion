@@ -8,15 +8,13 @@ The goal of this project is to convert CTD profiles into seperate and a combined
 ## Dependencies
 Made on a MacOs
 python
-in deep_water_simple.yml
+in requirements.yml
 install dependencies in a virtual environment
 `code here`
 
 ```python
-conda env create -f deep_water_simple.yml
+conda env create -f requirements.yml
 ```
-
-
 
 
 
