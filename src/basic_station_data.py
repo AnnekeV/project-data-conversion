@@ -23,7 +23,7 @@ class ValueTooLargeError(Error):
 
 # %%
 path_parent = Path.cwd().parent
-path_stations = path_parent.joinpath("data","temp", "Stations GHF.csv")
+path_stations = path_parent.joinpath("data", "temp", "Stations GHF.csv")
 stat_loc = pd.read_csv(path_stations)
 
 
