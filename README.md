@@ -6,7 +6,7 @@ The goal of this project is to convert CTD profiles into seperate and a combined
 
 
 ## Dependencies
-
+Made on a MacOs
 python
 in deep_water_simple.yml
 install dependencies in a virtual environment
