@@ -26,8 +26,8 @@ conda env create -f deep_water_simple.yml
 You should be able to use python and know how virtual environments work 
 `conda activate deep_water`
 
-1. Put CTD data in 'data/raw'
-2. Run 'ctd_monthly.py'
+1. Put CTD data in `data/raw`
+2. Run `ctd_monthly.py`
 
 ## Project Structure
 
