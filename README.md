@@ -1,12 +1,16 @@
 # Project for converting data from ctd and mooring to netcdf
 
-This simple project structure template repository is adapted from the [Good Enough Project](https://github.com/bvreede/good-enough-project) Cookiecutter template by Barbara Vreede (2019).
-If you plan to develop a package, check the [template repository for a Python package](https://github.com/UtrechtUniversity/re-python-package).
+The goal of this 
+
+
 
 
 ## Dependencies
 
 python
+in deep_water_simple.yml
+install dependencies using the following line of code
+
 
 
 
@@ -51,3 +55,9 @@ Create a citation file for your repository using [cffinit](https://citation-file
 ## License
 
 This project is licensed under the terms of the [MIT License](/LICENSE).
+
+
+## Origin of the project structure (from workshop)
+This simple project structure template repository is adapted from the [Good Enough Project](https://github.com/bvreede/good-enough-project) Cookiecutter template by Barbara Vreede (2019).
+If you plan to develop a package, check the [template repository for a Python package](https://github.com/UtrechtUniversity/re-python-package).
+
