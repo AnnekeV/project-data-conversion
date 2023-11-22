@@ -10,12 +10,12 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from os import listdir
 import os.path
+import ctd
 from geopy import Point
 from basic_station_data import stat_loc, find_distance_from_fjordmouth
 import functions as functions
 import importlib
 importlib.reload(functions)
-import ctd
 
 # define paths
 plt.style.use("ggplot")
@@ -29,7 +29,8 @@ figpath = os.path.join(path_parent, "Figures")
 if not os.path.exists(path_intermediate_files_netcdf):
     os.makedirs(path_intermediate_files_netcdf)
 
-# %% Importing station data and combining it to a bigger datase
+# %% Importing station data and combining it to a bigger dataset
+
 
 def split_header(header):
     """
@@ -97,6 +98,7 @@ for year in ["2018", "2019"]:
     stat["Coordinates"] = stat.apply(
         lambda row: Point(latitude=row["Latitude"], longitude=row["Longitude"]), axis=1
     )
+
     stat["Date"] = pd.to_datetime(stat["YYYYMMDD"], format="%Y%m%d")
     stat["Name"] = stat["St.No."].copy()
     stat = stat.set_index(stat["St.No."])
