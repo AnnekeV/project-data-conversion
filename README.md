@@ -9,8 +9,12 @@ The goal of this
 
 python
 in deep_water_simple.yml
-install dependencies using the following line of code
+install dependencies in a virtual environment
+`code here`
 
+```python
+conda env create -f deep_water_simple.yml
+```
 
 
 
@@ -19,7 +23,11 @@ install dependencies using the following line of code
 
 ## Usage
 
-Click "Use this template" at the top of this page to create a new repository with the same folder structure.
+You should be able to use python and know how virtual environments work 
+`conda activate deep_water`
+
+1. Put CTD data in 'data/raw'
+2. Run 'ctd_monthly.py'
 
 ## Project Structure
 
