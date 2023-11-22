@@ -2,7 +2,7 @@
 
 The goal of this project is to convert CTD profiles into seperate and a combined netcdf file that can be published. 
 
-
+![alt text](img/conceptual_diagram.jpg)
 
 
 ## Dependencies
