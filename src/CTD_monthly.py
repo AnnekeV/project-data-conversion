@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-This files analyses and combines monthly CTD files
+This files analyses and combines monthly CTD files an converts them to netcdf files
+https://adc.met.no/node/4
 
 """
 # %%
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import pathlib
 import matplotlib.pyplot as plt
@@ -16,6 +17,7 @@ from geopy import Point
 from basic_station_data import stat_loc, find_distance_from_fjordmouth
 import functions as functions
 import importlib
+
 importlib.reload(functions)
 
 # define paths
@@ -57,7 +59,7 @@ def split_header(header):
         for subline in sublines:
             if "=" in subline:
                 key, value = subline.split("=")
-                key = key.strip() 
+                key = key.strip()
                 value = (
                     value.strip()
                 )  # Remove leading/trailing whitespaces from the value
@@ -99,6 +101,10 @@ for year in ["2018", "2019"]:
     stat["Coordinates"] = stat.apply(
         lambda row: Point(latitude=row["Latitude"], longitude=row["Longitude"]), axis=1
     )
+    stat["YYYYMMDD UTC"] = pd.to_datetime(
+        stat["YYYYMMDD"].astype(str) + " " + stat["UTC"].astype(str),
+        format="%Y%m%d %H%M",
+    )
 
     stat["Date"] = pd.to_datetime(stat["YYYYMMDD"], format="%Y%m%d")
     stat["Name"] = stat["St.No."].copy()
@@ -132,7 +138,7 @@ for year in ["2018", "2019"]:
         counter += 1
         print(counter)
 
-        cast = ctd.from_cnv(fname)  #   
+        cast = ctd.from_cnv(fname)  #
         down, up = cast.split()
         down = down.rename(
             columns={
@@ -141,13 +147,18 @@ for year in ["2018", "2019"]:
                 "density00": "Density",
             }
         )
-        
+
         metadata = cast._metadata
 
         if not metadata["name"] in stat.index:
             print(f"\n Station {metadata['name']} is not in the overview file !!")
             continue
         this_stat = stat.loc[metadata["name"]]
+        down["timeJyear"] = pd.to_timedelta(
+            down.timeJ - 1, unit="days"
+        ) + pd.to_datetime(
+            "2018-01-01 00:00:00"
+        )  # substract 1 because than it matches with independent time records
         meta = [
             "Latitude",
             "Longitude",
@@ -165,8 +176,6 @@ for year in ["2018", "2019"]:
 
         down = down.reset_index()
         all_thisyear = pd.concat([all_thisyear, down], axis="index")
-
-
 
     # ==================
     #  All stations all years
@@ -189,22 +198,69 @@ df_monthly["id"] = df_monthly["Name"].copy()
 # df_monthly.to_csv(f"{path_intermediate_files}/monthly_18_19_gf10.csv")
 # %%
 # =================================
-# Assign attributes and convert to xarray
+# Assign attributes and convert to xarray, according to ADC.met.no Arctic data centre
 # =================================
 ds_single = down.set_index("Pressure [dbar]").to_xarray()
 ds_single = ds_single[["Potential temperature", "Salinity", "Density"]]
 
-# set attributes
-time_coverage_start = datetime.strptime(
+# even more generic
+user_name = "Anneke Vries"
+
+# generic data  attributes
+data_type = "CTD"
+featureType = "profile"
+instrument = "Sea-Bird SBE19plus"
+keyword_vocabulary = "GCMD Science Keywords"
+keywords = "EARTH SCIENCE>OCEANS>OCEAN TEMPERATURE>WATER TEMPERATURE, EARTH SCIENCE>OCEANS>OCEAN PRESSURE>WATER PRESSURE,EARTH SCIENCE>OCEANS>SALINITY/DENSITY>SALINITY"
+Conventions = "ACDD-1.3"
+datenow_utc =  f"{datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')}
+history = f"{datenow_utc} converted to netcdf with xarray by {user_name}"
+processing_level = "binning and manual inspection"
+date_created = datenow_utc
+creator_type = "person"
+creator_institution = "NIOZ Royal Netherlands Institute for Sea Research"
+creator_name = user_name
+creator_email = "anneke.vries@nioz.nl"
+creator_url = "https://orcid.org/0000-0001-9970-1189"
+project = "UU-NIOZ Greenland fjords as gateways between the ice sheet and the ocean"
+platform = "ship"
+license =  "https://creativecommons.org/licenses/by/4.0/"
+iso_topic_category = "oceans"
+
+# profile specific attributes
+start_time = datetime.strptime(
     metadata["config"]["start_time"].split("[")[0].strip(), "%b %d %Y %H:%M:%S"
-).strftime("%Y-%m-%d %H:%M:%S")
+)  # when the instrument started recording
+time_coverage_start = down["timeJyear"].iloc[0]  # first measurement in dataframe
+time_coverage_end = down["timeJyear"].iloc[-1]
+time_recorded = this_stat["YYYYMMDD UTC"]  # as recorded in seperate sheet
+if abs(time_coverage_start - time_recorded) > timedelta(hours=1):
+    raise ValueError(
+        f"Time coverage start {time_coverage_start} and time recorded {time_recorded} are more than 1 hour apart"
+    )
 
 
+GCRC_station_number = this_stat["Name"]
+latitude = this_stat["Latitude"]
+longitude = this_stat["Longitude"]
+geospatial_lat_min = latitude
+geospatial_lat_max = latitude
+geospatial_lon_min = longitude
+geospatial_lon_max = longitude
+source = f"{data_type} #{GCRC_station_number}"
+
+
+
+title = f"{data_type} {featureType} {this_stat['Name']} on {this_stat['Date']}, in Nuup Kangerlua, Greenland"
+summary = f"The file contains potential temperature, practical salinity and depth measurements binned into 1 db bins. The raw data was measured at {latitude:.3f}N, {longitude:.3f}E, on {this_stat['Date']} UTC , with a {instrument}. The data was collected by the Greenland Climate Research Center (GCRC)"
 
 # assign attributes to ds_single
-ds_single.attrs["time_coverage_start"] = time_coverage_start
+ds_single.attrs["time_coverage_start"] = time_coverage_start.strftime("%Y-%m-%dT%H:%MZ")
 
-ds_single.to_netcdf(f"{path_intermediate_files_netcdf}/test.nc")
+
+ds_single
+# ds_single.to_netcdf(f"{path_intermediate_files_netcdf}/test.nc")
 
 
 # %%
+# combine column YYYYMMDD and UTC IN stat
