@@ -2,7 +2,7 @@
 
 The goal of this project is to convert CTD profiles into seperate and a combined netcdf file that can be published. 
 
-![alt text](img/conceptual_summary.jpg)
+![Flow diagram: from cnv to netcdf](img/conceptual_summary.png "Flow diagram")
 
 
 ## Dependencies
@@ -15,7 +15,6 @@ install dependencies in a virtual environment
 ```python
 conda env create -f deep_water_simple.yml
 ```
-
 
 
 
