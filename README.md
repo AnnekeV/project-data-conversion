@@ -1,6 +1,6 @@
 # Project for converting data from ctd and mooring to netcdf
 
-The goal of this 
+The goal of this project is to convert CTD profiles into seperate and a combined netcdf file that can be published. 
 
 
 
