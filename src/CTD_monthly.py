@@ -19,7 +19,7 @@ import importlib
 import math
 from mpl_toolkits.basemap import Basemap
 from os import listdir
-
+import xarray as xr
 
 
 importlib.reload(functions)
@@ -31,8 +31,9 @@ try:
     path_parent = pathlib.Path(__file__).parent.parent.resolve()
 except NameError:
     path_parent = Path.cwd().parent.resolve()
-path_intermediate_files = Path.cwd().parent.joinpath("data", "temp")
+path_intermediate_files = path_parent.joinpath("data", "temp")
 path_intermediate_files_netcdf = path_intermediate_files.joinpath("netcdf")
+print(path_intermediate_files_netcdf)
 figpath = os.path.join(path_parent, "Figures")
 
 # %% if it's not there yet, create the intermediate folder
@@ -87,7 +88,7 @@ all_years = pd.DataFrame()
 
 
 def extract_station_info(path_parent, year):
-    path_data = os.path.join(path_parent, "data", "raw", "CTD", year)
+    path_data = path_parent.joinpath(Path("data", "raw", "CTD", year))
 
     # % manually importing station information
     station_info = path_parent.joinpath(Path("data", "raw", "CTD", year, f"{year}.txt"))
@@ -430,6 +431,7 @@ def save_dsCTD_to_netcdf(ds_single_CTD, path_intermediate_files_netcdf):
     path_intermediate_files_netcdf : string
         path to the intermediate files
     """
+    print(path_intermediate_files_netcdf)
 
     # Save to netcdf
     ds_single_CTD.to_netcdf(
@@ -468,7 +470,26 @@ class InteractivePlot:
             print("Invalid key")
 
 
+# remove last line
+def remove_last_line(dfCTD):
+    dfCTD = dfCTD.iloc[:-1]
+    return dfCTD
+
+
+def is_string_in_filenames(directory, search_string):
+    # List all files in the directory
+    files = os.listdir(directory)
+
+    # Check if the search string is in any filename
+    for file in files:
+        if search_string in file:
+            return True
+
+    return False
+
+
 if __name__ == "__main__":
+    list_of_all_stations = []
     for year in ["2018", "2019"]:
         path_data, stat = extract_station_info(path_parent, year)
         # Import profile every file as a ctd
@@ -480,7 +501,34 @@ if __name__ == "__main__":
         for fname in Path(path_data).rglob("*.cnv"):
             counter += 1
             down, metadata, this_stat = extract_CTD(fname, stat)
-            if len(down) < 1:
+            if down is None:
                 continue
+            print(f"{this_stat['Name']}")
+
+            if this_stat["Name"] in ["GF18090"]:
+                down = remove_last_line(down)
             ds_single_CTD = make_xarray_with_attributes(down, metadata, this_stat)
-            interactive_plot = InteractivePlot(ds_single_CTD)
+            if is_string_in_filenames(
+                path_intermediate_files_netcdf, this_stat["Name"]
+            ):
+                print(f"{this_stat['Name']} already converted to netcdf")
+            else:
+                save_dsCTD_to_netcdf(ds_single_CTD, path_intermediate_files_netcdf)
+
+            # check of str is in list
+
+            # interactive_plot = InteractivePlot(ds_single_CTD)
+            list_of_all_stations.append(
+                ds_single_CTD.assign_coords(
+                    time=ds_single_CTD.attrs["time_coverage_start"],
+                    latitude=ds_single_CTD.attrs["geospatial_lat_min"],
+                    longitude=ds_single_CTD.attrs["geospatial_lon_min"],
+                    station=ds_single_CTD.attrs["GCRC_station_number"],
+                )
+            )
+
+    combined = xr.concat(list_of_all_stations, dim="station")
+    combined.to_netcdf(f"{path_intermediate_files_netcdf}/CTD_all_stations.nc")
+
+
+# %%
