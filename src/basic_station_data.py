@@ -4,6 +4,7 @@ import pandas as pd
 from pathlib import Path
 from geopy.distance import geodesic as GD
 from geopy.distance import great_circle as GRC
+import pathlib
 
 
 # %%
@@ -22,7 +23,7 @@ class ValueTooLargeError(Error):
 
 
 # %%
-path_parent = Path.cwd()
+path_parent = pathlib.Path(__file__).parent.parent.resolve()
 path_stations = path_parent.joinpath("data", "raw", "Stations GHF.csv")
 stat_loc = pd.read_csv(path_stations)
 
@@ -69,9 +70,9 @@ def find_distance_from_fjordmouth(pointA):
 
     elif (closest["distance"] > abs(dist_between) + 1) or (closest["distance"] > 15):
         dist_from_mouth = 999
-        print(
-            f"Something is wrong with {pointA}, distance to closest station is {closest['distance']:.1f} km"
-        )
+        # print(
+        #     f"Something is wrong with {pointA}, distance to closest station is {closest['distance']:.1f} km"
+        # )
     else:
         if (
             dist_between < 0
