@@ -489,6 +489,7 @@ def is_string_in_filenames(directory, search_string):
 
 
 if __name__ == "__main__":
+    check_figure = True
     list_of_all_stations = []
     for year in ["2018", "2019"]:
         path_data, stat = extract_station_info(path_parent, year)
@@ -512,12 +513,14 @@ if __name__ == "__main__":
                 path_intermediate_files_netcdf, this_stat["Name"]
             ):
                 print(f"{this_stat['Name']} already converted to netcdf")
+            elif check_figure:            
+                interactive_plot = InteractivePlot(ds_single_CTD)
             else:
                 save_dsCTD_to_netcdf(ds_single_CTD, path_intermediate_files_netcdf)
 
             # check of str is in list
 
-            # interactive_plot = InteractivePlot(ds_single_CTD)
+
             list_of_all_stations.append(
                 ds_single_CTD.assign_coords(
                     time=ds_single_CTD.attrs["time_coverage_start"],
