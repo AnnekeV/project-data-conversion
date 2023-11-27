@@ -5,18 +5,20 @@ from pathlib import Path
 import ctd
 from matplotlib import dates
 import matplotlib.dates as mdates
-
 import matplotlib.pyplot as plt
 import matplotlib.colors
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+import pathlib
+import os
+from os import listdir
 
 plt.style.use("ggplot")
 pd.options.plotting.backend = "matplotlib"
 
-# %% cmd shift space is docu
+# %% define paths
 
 path_parent = Path.cwd().parent.parent
 figpath = path_parent.joinpath(Path("Figures"))
@@ -25,6 +27,23 @@ fname = "/Users/annek/Library/CloudStorage/OneDrive-SharedLibraries-NIOZ/PhD Ann
 fpath = str(path_parent) + "/Data/Moorings/20190612_SBE_GF10/"
 fpath_GF13 = str(path_parent.joinpath("Data", "Moorings", "20190802_SBE_GF13")) + "/"
 fpath_GF10 = fpath
+
+
+# define paths
+plt.style.use("ggplot")
+pd.options.plotting.backend = "matplotlib"
+try:
+    path_parent = pathlib.Path(__file__).parent.parent.resolve()
+except NameError:
+    path_parent = Path.cwd().parent.resolve()
+path_data = path_parent.joinpath("data", "raw", "Moorings", "20190612_SBE_GF10")
+
+fileNames = [
+    f for f in listdir(path_data) if (f.endswith(".cnv"))
+]
+print(fileNames)
+
+# %% FUNCTIONS
 
 
 def open_cnv(fname, remove_5m=True):
