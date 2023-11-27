@@ -13,16 +13,13 @@ import pandas as pd
 import os.path
 import ctd
 from geopy import Point
-from basic_station_data import stat_loc, find_distance_from_fjordmouth
-import functions as functions
 import importlib
 import math
 from mpl_toolkits.basemap import Basemap
 from os import listdir
 import xarray as xr
+from functions_convert import * # import split_header
 
-
-importlib.reload(functions)
 
 # define paths
 plt.style.use("ggplot")
@@ -41,47 +38,6 @@ if not os.path.exists(path_intermediate_files_netcdf):
     os.makedirs(path_intermediate_files_netcdf)
 
 # %% Importing station data and combining it to a bigger dataset
-
-
-def split_header(header):
-    """
-    Split header into a dictionary, based on the = sign
-    For example:
-    start_time = Mar 29 2018 14:00:00
-
-    Parameters
-    ----------
-    header : string
-        header or config of the CTD file, as a string
-
-    Returns
-    -------
-    data_dict : dictionary
-        dictionary with the header information
-    """
-    lines = header.split("\n")
-
-    data_dict = {}
-    for line in lines:
-        sublines = line.split(",")
-        for subline in sublines:
-            if "=" in subline:
-                key, value = subline.split("=")
-                key = key.strip()
-                value = (
-                    value.strip()
-                )  # Remove leading/trailing whitespaces from the value
-                if "* " in key:
-                    key = key.split("* ")[1]
-                if "# " in key:
-                    key = key.split("# ")[1]
-
-                try:
-                    value = float(value)
-                except ValueError:
-                    pass
-                data_dict[key] = value
-    return data_dict
 
 
 all_years = pd.DataFrame()
@@ -202,7 +158,7 @@ def make_xarray_with_attributes(down, metadata, this_stat):
     ds_single = down.set_index("Pressure [dbar]").to_xarray()
     ds_single = ds_single[["Potential temperature", "Salinity", "Density"]]
     #  set units, standard_name, long_name
-    ds_single["Potential temperature"].attrs["units"] = "degree)C"
+    ds_single["Potential temperature"].attrs["units"] = "degree C"
     ds_single["Potential temperature"].attrs[
         "standard_name"
     ] = "sea_water_potential_temperature"

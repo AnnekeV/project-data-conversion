@@ -14,8 +14,15 @@ import plotly.graph_objects as go
 import pathlib
 import os
 from os import listdir
+import functions_convert as func
+import importlib
+import xarray as xr
+from CTD_monthly import extract_station_info
 
-plt.style.use("ggplot")
+importlib.reload(func)
+
+
+plt.style.use("fast")
 pd.options.plotting.backend = "matplotlib"
 
 # %% define paths
@@ -49,18 +56,25 @@ print(fileNames)
 def open_cnv(fname, remove_5m=True):
     """Open cnv file and export dataframe down and metadata and cast"""
     cast = ctd.from_cnv(fname)  #
-    cast = rename_variables(cast, remove_5m)
-    down, up = cast.split()
     metadata = cast._metadata
-    return down, metadata, cast
+    metadata["config_original"] = metadata["config"]
+    metadata["header_original"] = metadata["header"]
+    metadata["header"] = func.split_header(metadata["header"])
+    metadata["config"] = func.split_header(metadata["config"])
+    cast = rename_variables(cast, remove_5m)
+    return cast, metadata
 
 
 def rename_variables(df, remove_5m):
     """renames the variables as in cnv to shorter and equal names  AND REMOVES OUTLIERS"""
     df = df.rename(
         columns={
-            "potemp090C": "temp",
-            "sal00": "sal",
+            "t090": "temp_insitu",
+            "tv290C": "temp_insitu",
+            "potemp090C": "temp_pot",
+            "c0S/m": "cond",
+            "cond0S/m": "cond",
+            "sal00": "sal_prac",
             "density00": "dens",
             "timeJV2": "time",
             "timeJ": "time",
@@ -84,7 +98,7 @@ def remove_above_zero(cast):
     start = (cast["Pressure [dbar]"] > 0.15).idxmax()
     cast = cast.iloc[start:]
     cast = cast[cast["Pressure [dbar]"] > 0.15].reset_index()
-    print(f"Nr. rows below water surface (dbar<0.15):{rows_before-len(cast.index)}")
+    print(f"Nr. rows above water surface (dbar<0.15):{rows_before-len(cast.index)}")
     return cast
 
 
@@ -93,7 +107,7 @@ def remove_outliers_5m(cast, nr_per_hour=6):
     nr_per_hour  = nr obs per hour, default every 10 min, is 6 times per hour,
     with built in safety so you don't do it for other depth than 5 m"""
     if cast["Pressure [dbar]"].mean() < 10:
-        df5 = cast[["temp", "sal"]]
+        df5 = cast[["temp_insitu", "sal_prac"]]
         window = nr_per_hour * 24 * 28  # 4 weeks
         max_z = 3  # max std dev
         z_scores_alt = (
@@ -136,6 +150,7 @@ def time_to_date(fname, cast, start_time="Jan 1 2018"):
     dt_start_time = datetime.strptime(start_time, "%b %d %Y")
     cast["timedelta"] = cast.time.apply(lambda x: timedelta(x))
     cast["date"] = cast["timedelta"] + dt_start_time
+    cast["date"] = cast["date"].dt.round("5s") # round to 5 seconds so moorings align
 
 
 def nearest(items, pivot):
@@ -145,284 +160,150 @@ def nearest(items, pivot):
 # %%
 
 labels = {
-    "temp": "Potential temperature [C]",
-    "sal": "Salinity [PSU]",
+    "temp_pot": "Potential temperature [C]",
+    "sal_prac": "Salinity [PSU]",
     "month": "Month",
     "depth": "Depth [m]",
     "2018.0": "",
     "2019.0": "",
 }
 
-# %%
-
-fname = "/Users/annek/Library/CloudStorage/OneDrive-SharedLibraries-NIOZ/PhD Anneke Vries - General/Data/Moorings/20190612_SBE_GF10/20190612_SBE5968_540m.cnv"
-# fname = fpath_GF13+"20190802_SBE16523_20m.cnv"
-
-
-start_time = "Jan 1 2018"
-
-
-fig, axes = plt.subplots(1, 3, sharex=True, figsize=[20, 10])
-
-down, metadata, cast = open_cnv(fname, remove_5m=False)
-time_to_date(fname, cast, start_time)
-
-
-y = "date"
-cast.plot.scatter(y="temp", x=y, ax=axes[1], color="red")
-cast.plot.scatter(y="sal", x=y, ax=axes[2], color="red")
-cast.plot.scatter(y="dens", x=y, ax=axes[0], color="red")
-
-
-# cast = remove_outliers_5m(cast)
-# cast = remove_outliers_5m(cast)
-
-cast.plot.scatter(y="temp", x=y, ax=axes[1], title="Temperature")
-cast.plot.scatter(y="sal", x=y, ax=axes[2], title="Salinity")
-cast.plot.scatter(y="dens", x=y, ax=axes[0], title="Density")
-cast.plot.scatter(y="Pressure [dbar]", x=y, title="Pressure")
-
-
-# cast = cast.reset_index(d)
-plt.show()
-
-cast.plot(x="date", y="Pressure [dbar]")
-
-# %%
-# Diffusion for mooring at 540 m
-from sklearn.linear_model import LinearRegression
-
-pd.options.plotting.backend = "matplotlib"
-
-
-down, metadata, cast_540 = open_cnv(f"{fpath_GF10}20190612_SBE5968_540m.cnv", False)
-cast_diffusion = cast_540.set_index("time")[:470].reset_index()
-X = cast_diffusion["time"].values.reshape(
-    -1, 1
-)  # values converts it into a numpy array
-Y = cast_diffusion["dens"].values.reshape(
-    -1, 1
-)  # -1 means that calculate the dimension of rows, but have 1 column
-Z = cast_diffusion["Pressure [dbar]"].values.reshape(
-    -1, 1
-)  # -1 means that calculate the dimension of rows, but have 1 column
-
-
-def lin_reg(X, Y):
-    """Linear regression for Array X and Y
-    Creates plot also"""
-    linear_regressor = LinearRegression()  # create object for the class
-    linear_regressor.fit(X, Y)  # perform linear regression
-    Y_pred = linear_regressor.predict(X)  # make predictions
-    plt.scatter(X, Y)
-    plt.plot(X, Y_pred, color="blue")
-
-    r_sq = linear_regressor.score(X, Y)
-    print(f"coefficient of determination: {r_sq}")
-    print(f"intercept: {linear_regressor.intercept_}")
-    print(f"slope: {linear_regressor.coef_}")
-    return np.squeeze(linear_regressor.coef_)
-
-
-slope = lin_reg(X, Y)
-print(f"slope: {np.squeeze(slope)/(24*3600)} kg/m3/s")
-
-plt.xlabel("Days since 1-1-2018")
-plt.ylabel("Density [kg/m3 ]")
-plt.title("Diffusion at 540 m")
-plt.show()
-
-sc = plt.scatter(Z, Y - 1000, c=X, s=1)
-cax = plt.colorbar(sc)
-cax.set_label("Time [days since 1-1-2018]")
-plt.xlabel("Pressure [dbar]")
-plt.ylabel("Density [kg/m3]")
-plt.title("Mooring showing vertical diffusion at depth")
-plt.tight_layout()
-plt.savefig(f"{figpath}/Vertical_diffusion_from_microcat.png")
-plt.show()
-
-# %%
-pd.options.plotting.backend = "plotly"
-
-cast_540["tidal_amp"] = cast_540["Pressure [dbar]"] - cast_540["Pressure [dbar]"].mean()
-cast_540["spring_neap"] = (
-    cast_540["tidal_amp"].rolling(center=True, window=6 * 25).max()
-)
-fig = cast_540.set_index("date", drop=True)["spring_neap"].plot()
-fig.update_yaxes(title_text="Tidal amplitude [dbar]")
-# remove legend
-fig.update_layout(showlegend=False)
-# save as html
-fig.write_html(f"{figpath}/Tidal_amplitude.html")
-
-# %% Grid
-# Grid
-pd.options.plotting.backend = "matplotlib"
-
-
-variables = ["temp", "sal", "sigma-dens", "Pressure [dbar]"]
-mooring = "GF13"
-
-
-if mooring == "GF10":
-    # GF10 microcat files
-    files = [
-        "20190612_SBE5968_540m.cnv",
-        "20190612_SBE5969_330m.cnv",
-        "20190612_SBE5970_150m.cnv",
-        "20190612_SBE5971_60m.cnv",
-        "20190821_SBE4247_5m.cnv",
-        "20180828_SBE2989_5m.cnv",
-    ]
-    files = files[::-1]
-    fpath = fpath_GF10
-elif mooring == "GF13":
-    # GF13 microcat files
-    files = [
-        "20190802_SBE16523_20m.cnv",
-        "20190802_SBE15390_60m.cnv",
-        "20190802_SBE15399_120m.cnv",
-    ]
-    fpath = fpath_GF13
-else:
-    files = ""
-
-nr_moorings = len(files)
-fig, axes = plt.subplots(nr_moorings, len(variables), sharex=True, figsize=[20, 10])
-for i in range(nr_moorings):
-    cast, metadata, cast = open_cnv(fpath + files[i])
-    if files[i] == "20180828_SBE2989_5m.cnv":
-        start_time = "Jan 1 2017"
-    else:
-        start_time = "Jan 1 2018"
-    time_to_date(fpath + files[i], cast, start_time)
-    for j in range(len(variables)):
-        title = files[i].split("_")[2].split(".")[0] + " " + variables[j]
-        ax = axes[i, j]
-        cast = cast.set_index("date")
-        cast = cast.rolling(6 * 50).mean()
-        cast = cast.reset_index()
-        cast.plot.line(
-            x="date",
-            y=variables[j],
-            ax=ax,
-            # title = title,
-            legend=True,
-            label=title,
-            # s=.5
-        )
-        # remove_outliers(cast).plot.scatter(x='date',y=variables[j], ax=ax )
-        ax.xaxis.set_major_formatter(
-            dates.ConciseDateFormatter(ax.xaxis.get_major_locator())
-        )
-        # ax.set_ylim([0,10])
-# plt.xlim(datetime(2018, 10, 1), datetime(2018, 12, 1))
-plt.tight_layout()
-
-# plt.savefig(f"{figpath}/grid_50_hr_rolling_mean_{mooring}.png")
-
-
-# %% Plot difference compared to mean pressure
-pd.options.plotting.backend = "matplotlib"
-
-ax = plt.figure()
-for i in range(nr_moorings):
-    cast, metadata, cast = open_cnv(fpath + files[i])
-    time_to_date(fpath + files[i], cast, start_time)
-    ax = (
-        cast.groupby(cast.date.dt.date)
-        .mean()["Pressure [dbar]"]
-        .apply(lambda x: x - cast["Pressure [dbar]"].mean())
-        .iloc[:-1]
-        .plot(label=files[i])
-    )
-ax.xaxis.set_major_formatter(dates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
-plt.legend()
-plt.ylabel("Pressure [dbar]")
-plt.title("Relative pressure difference per day compared to mean")
-plt.show()
-
-
-ax2 = plt.figure()
-for i in range(nr_moorings):
-    cast, metadata, cast = open_cnv(fpath + files[i])
-    time_to_date(fpath + files[i], cast, start_time)
-    ax2 = (
-        cast["Pressure [dbar]"]
-        .apply(lambda x: x - cast["Pressure [dbar]"].mean())
-        .iloc[:-1]
-        .plot(label=files[i].split("_")[2].split(".")[0])
-    )
-    max_tide = (
-        cast["Pressure [dbar]"]
-        .apply(lambda x: x - cast["Pressure [dbar]"].mean())
-        .abs()
-        .max()
-    )
-    print(f"Max pressure is {max_tide} m")
-
-ax2.xaxis.set_major_formatter(dates.ConciseDateFormatter(ax2.xaxis.get_major_locator()))
-plt.legend()
-plt.ylabel("Pressure [dbar]")
-plt.title("Relative pressure difference compared to mean")
-plt.show()
-
-# %% Plot T/S
-
-
-fig, ax = plt.subplots(1, 1, sharex=True, figsize=[10, 10])
-for i in range(nr_moorings):
-    title = files[i].split("_")[2].split(".")[0] + " "
-    cast, metadata, cast = open_cnv(fpath + files[i])
-    time_to_date(fpath + files[i], cast)
-    # cast.groupby(cast.date.dt.date).mean().plot(x='sal',y='temp', ax=ax,
-    #             legend=True,
-    #             label = "avg date " + title,
-    # )
-    cast.rolling(6 * 24 * 7).mean().plot(
-        x="sal",
-        y="temp",
-        ax=ax,
-        legend=True,
-        label=title,
-    )
-plt.ylabel("Temperature")
-plt.xlabel("Salinity")
-plt.title("Weekly rolling average")
-plt.tight_layout()
 
 
 # %%   Group all files together
-# Open monthly data
+# Open monthly data of CTD profiles
 
+# only select files that start with 2019
+files = [f for f in fileNames if f.startswith("2019")]
+nr_moorings = len(files)
 all_moorings = pd.DataFrame()
+
+dsAllMoorings = xr.Dataset()
+
+def check_if_var_not_nan(df, var):
+    """Checks if variable contains only NaN values, if so, raises error
+    Parameters
+    ----------
+    df : dataframe
+        dataframe with variable
+    var : string
+    """
+    if df[var].isnull().values.all():
+        print(f"Variable {var} contains only NaN values")
+        raise ValueError(f"Variable {var} for {df.depth[0]} m contains only NaN values")
+
 
 for i in range(nr_moorings):
     depth = files[i].split("_")[2].split("m.")[0]
-    cast, metadata, cast = open_cnv(fpath + files[i])
-    if files[i] == "20180828_SBE2989_5m.cnv":
-        start_time = "Jan 1 2017"
-    else:
-        start_time = "Jan 1 2018"
-    time_to_date(fpath + files[i], cast, start_time)
+    cast, metadata = open_cnv(f"{path_data}/{files[i]}")
+    # parse dates
+    StartTimeInstrument = datetime.strptime(metadata["config"]["start_time"].split(" [")[0],  "%b %d %Y %H:%M:%S")
+    StartTimeJulianDays = datetime.strptime(f"{StartTimeInstrument.year}-01-01", "%Y-%m-%d")
+
+    time_to_date(f"{path_data}/{files[i]}", cast, StartTimeJulianDays.strftime("%b %d %Y"))
+
     cast["depth"] = depth
+    # rename Pressure [dbar] to pressure
+    cast = cast.rename(columns={"Pressure [dbar]": "pressure", "time": "days_julian"})
+    for var in ["temp_pot", "sal_prac", "dens", "temp_insitu", "cond"]:
+        check_if_var_not_nan(cast, var)
+
+
     all_moorings = pd.concat([all_moorings, cast]).reset_index(drop=True)
-    print(i)
+
+    cast["id"] = cast["depth"].astype("int")
+    cast = cast.set_index(["id", "date"])
+    dsSingleMooring = cast.drop(columns=["index", "timedelta"]).to_xarray()
+
+    #set attributes    
+    dsSingleMooring["temp_pot"].attrs = {"long_name": "Potential temperature", "units": "degree C"}
+    dsSingleMooring["temp_insitu"].attrs = {"long_name": "In situ temperature as measured ", "units": "degree C"}
+    dsSingleMooring["sal_prac"].attrs = {"long_name": "Practical salinity", "units": "PSU"}
+    dsSingleMooring["dens"].attrs = {"long_name": "Density", "units": "kg/m3"}
+    dsSingleMooring["cond"].attrs = {"long_name": "Conductivity as measured", "units": "S/m"}
+    dsSingleMooring["depth"].attrs = {"long_name": "Planned depth of instrument", "units": "m"}
+    dsSingleMooring["days_julian"].attrs = {"long_name": "Time in julian days since start of specific year", "units": f"days since {StartTimeJulianDays}"}
+    dsSingleMooring["date"].attrs = {"long_name": "Date in datetime format"}
+
+
+    dsAllMoorings = xr.merge([dsAllMoorings, dsSingleMooring])
+
+
+datenow_utc = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+user_name = "Anneke Vries"
+
+dsAllMoorings.attrs = {
+    "data_type": "CTD",
+    "featureType": "profile",
+    "instrument": "Sea-Bird SBE19plus",
+    "keyword_vocabulary": "GCMD Science Keywords",
+    "keywords": "EARTH SCIENCE>OCEANS>OCEAN TEMPERATURE>WATER TEMPERATURE, EARTH SCIENCE>OCEANS>OCEAN PRESSURE>WATER PRESSURE,EARTH SCIENCE>OCEANS>SALINITY/DENSITY>SALINITY",
+    "Conventions": "ACDD-1.3",
+    "datenow_utc": f"{datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')}",
+    "history": f"{datenow_utc} converted to netcdf with xarray by {user_name}",
+    "processing_level": "manual inspection, removing outliers (>3x std), remove measurements close to water surface (<0.15 dbar)",
+    "date_created": datenow_utc,
+    "creator_type": "person",
+    "creator_institution": "NIOZ Royal Netherlands Institute for Sea Research",
+    "creator_name": user_name,
+    "creator_email": "anneke.vries@nioz.nl",
+    "creator_url": "https://orcid.org/0000-0001-9970-1189",
+    "project": "UU-NIOZ Greenland fjords as gateways between the ice sheet and the ocean",
+    "platform": "mooring",
+    "license": "https://creativecommons.org/licenses/by/4.0/",
+    "iso_topic_category": "oceans",
+}
+
+
+
+    # profile specific attributes
+    start_time = datetime.strptime(
+        metadata["config"]["start_time"].split("[")[0].strip(), "%b %d %Y %H:%M:%S"
+    )  # when the instrument started recording
+    time_coverage_start = down["timeJyear"].iloc[0]  # first measurement in dataframe
+    time_coverage_end = down["timeJyear"].iloc[-1]
+    time_recorded = this_stat["YYYYMMDD UTC"]  # as recorded in seperate sheet
+    if abs(time_coverage_start - time_recorded) > timedelta(hours=1):
+        raise ValueError(
+            f"Time coverage start {time_coverage_start} and time recorded {time_recorded} are more than 1 hour apart"
+        )
+    time_coverage_start = time_coverage_start.strftime("%Y-%m-%dT%H:%MZ")
+    time_coverage_end = time_coverage_end.strftime("%Y-%m-%dT%H:%MZ")
+
+    GCRC_station_number = this_stat["Name"]
+    latitude = this_stat["Latitude"]
+    longitude = this_stat["Longitude"]
+    geospatial_lat_min = latitude
+    geospatial_lat_max = latitude
+    geospatial_lon_min = longitude
+    geospatial_lon_max = longitude
+    source = f"{data_type} #{GCRC_station_number}"
+    GCRC_standard_station = this_stat["St."]
+
+    title = f"{data_type} {featureType} {this_stat['Name']} on {this_stat['Date']}, in Nuup Kangerlua, Greenland"
+    summary = f"The file contains potential temperature, practical salinity and depth measurements binned into 1 db bins. The raw data was measured at {latitude:.3f}N, {longitude:.3f}E, on {this_stat['Date']} UTC , with a {instrument}. The data was collected by the Greenland Climate Research Center (GCRC)"
+
 
 
 # all_moorings.to_csv(f"{path_parent.joinpath('Processing')}/intermediate_files/mooring_gf13.csv")
 
+df_monthly = pd.DataFrame()
+fCTDprofiles = path_parent.joinpath("data","temp_pot", "monthly_all_years_all_stations.csv")
+if not os.path.exists(fCTDprofiles):
+    print("File you are trying to open doesn't exist, will continue without. First run CTD_monthly.py if you want to include ctd profiles.")
+else:
 
-df_monthly = pd.read_csv(
-    Path.cwd().parent.joinpath("intermediate_files", "monthly_18_19_gf10.csv"),
-    index_col=0,
-    parse_dates=True,
-)
+    dfCTDprofiles = pd.read_csv(fCTDprofiles, index_col=0, parse_dates=True)
 all_moorings["id"] = all_moorings["depth"]
-df_combi = pd.concat([df_monthly, all_moorings])
+df_combi = pd.concat([dfCTDprofiles, all_moorings])
 
 
+all_moorings["id"] = all_moorings["id"].astype("int")
+dsAllMoorings = all_moorings.set_index(["id", "date"]).to_xarray()
+dsAllMoorings.temp_insitu.plot.line(x='date')
+
+
+        
 # %% 3D plot
 # fig = px.line_3d(df_combi,
 #     x="temp", y="date",
@@ -689,10 +570,10 @@ nr_moorings = 6
 
 for i in range(nr_moorings):
     depth = files[i].split("_")[2].split("m.")[0]
-    cast, metadata, cast = open_cnv(fpath + files[i])
+    cast, metadata, cast = open_cnv(f"{path_data}/{files[i]}")
     if files[i] == "20180828_SBE2989_5m.cnv":
         cast.time = cast.time - 365
-    time_to_date(fpath + files[i], cast, start_time)
+    time_to_date(f"{path_data}/{files[i]}", cast, start_time)
     cast = (
         cast.set_index("date")
         .resample(resample_interval)
