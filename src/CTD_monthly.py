@@ -13,6 +13,7 @@ import pandas as pd
 import os.path
 import ctd
 from geopy import Point
+from basic_station_data import stat_loc, find_distance_from_fjordmouth
 import importlib
 import math
 from mpl_toolkits.basemap import Basemap
