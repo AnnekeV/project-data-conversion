@@ -19,6 +19,7 @@ import math
 from mpl_toolkits.basemap import Basemap
 from os import listdir
 import xarray as xr
+import numpy as np
 from functions_convert import * # import split_header
 
 
@@ -104,7 +105,6 @@ def extract_CTD(fname, stat):
             "density00": "Density",
         }
     )
-
     metadata = cast._metadata
     if not metadata["name"] in stat.index:
         print(
@@ -445,9 +445,56 @@ def is_string_in_filenames(directory, search_string):
     return False
 
 
+# listDoNotIncludeTheseStations= 
+# listDoNotIncludeTheseStations= 
+Puattorfik_st = ["GF18077", "GF19006", "GF18013"]  # south of Sermitsiaq, crossroads of branches
+Puattorfik = {"name": "Puattorfik", "latitude_min": 64.21, "latitude_max": 64.25, "longitude_max": -51.45, "longitude_min": -51.35, "stations": Puattorfik_st}
+Uuummannap_Sullua_st = ["GF19007"] # Eastmost branch
+Uuummannap_Sullua = {"name": "Uuummannap_Sullua", "latitude_min": 64.25, "latitude_max": 64.38, "longitude_max": -50.95, "longitude_min": -51.15, "stations": Uuummannap_Sullua_st}
+Sulussugutip_Kgl_st = ["GF18108"]
+Kapsillit_st = ["GF19009", "GF19008"] # Kapisillit
+KangersuneqGF12NorthSide_st = ["GF18118", "GF18067"] # North side of Kangersuneq, near GF12
+KangersuneqGF12NorthSide = {"name": "KangersuneqGF12NorthSide", "latitude_min": 64.735, "latitude_max": 64.745, "longitude_min": -50.56, "longitude_max": -50.54, "stations": KangersuneqGF12NorthSide_st}
+GF10NorthSide_st = ["GF18072", "GF19048"] # North side of GF10
+GF10NorthSide = {"name": "GF10NorthSide", "latitude_min": 64.622, "latitude_max": 64.626, "longitude_min": -51.02, "longitude_max": -51.0, "stations": GF10NorthSide_st}
+OtherNorthWestSide_st = ["GF19081", "GF18113", "GF19079"]
+GF3 = {"name": "GF3", "latitude_min": 64.105, "latitude_max": 64.13, "longitude_min": -51.91, "longitude_max": -51.86}
+Mouth = {"name": "Mouth", "latitude_min": 63.95, "latitude_max": 64.15, "longitude_min": -52.3, "longitude_max": -51.95} 
+
+listDoNotIncludeTheseStations= np.concatenate((Puattorfik_st, Uuummannap_Sullua_st, Sulussugutip_Kgl_st, Kapsillit_st, KangersuneqGF12NorthSide_st, GF10NorthSide_st, OtherNorthWestSide_st))
+areas_not_include = [Puattorfik, Uuummannap_Sullua, KangersuneqGF12NorthSide, GF10NorthSide, GF3, Mouth]
+
+def check_if_excluded(this_stat, list_donot_include=None, areas_not_include=None):
+    ''' 
+    Check if the station should be excluded from the processing
+    Parameters
+    ----------
+    this_stat : dataframe
+        dataframe with the station information
+    list_donot_include : list
+        list of strings of stations to exclude
+    areas_not_include : list of dictionaries
+        list of areas to exclude, each dictionary should contain the keys "latitude_min", "latitude_max", "longitude_min", "longitude_max"
+
+    '''
+    if list_donot_include is not None:
+        if this_stat["Name"] in list_donot_include:
+            return True
+    #  check if latitude and longitude are in one of the area not include
+    if areas_not_include is not None:
+        for area in areas_not_include:
+            if (this_stat["Latitude"] > area["latitude_min"]) and (this_stat["Latitude"] < area["latitude_max"]) and (this_stat["Longitude"] > area["longitude_min"]) and (this_stat["Longitude"] < area["longitude_max"]):
+                return True
+    return False
+    
+        
+    
+
 if __name__ == "__main__":
-    check_figure = True
-    list_of_all_stations = []
+    check_figure = False
+    list_of_ds_all_stations = []
+    dfSelectedStationInfo = pd.DataFrame()
+
     for year in ["2018", "2019"]:
         path_data, stat = extract_station_info(path_parent, year)
         # Import profile every file as a ctd
@@ -460,15 +507,19 @@ if __name__ == "__main__":
             counter += 1
             down, metadata, this_stat = extract_CTD(fname, stat)
             if down is None:
+                print(f"Station {str(fname).split('/'[-1])} is not in the overview file, will be skipped")
+                # print(f"Station {this_stat['Name']} is not in the overview file, will be skipped")
                 continue
-            print(f"{this_stat['Name']}")
+            if check_if_excluded(this_stat, list_donot_include=listDoNotIncludeTheseStations, areas_not_include=areas_not_include):
+                print(f"{this_stat['Name']} is excluded from the processing")
+                continue
 
             if this_stat["Name"] in ["GF18090"]:
                 down = remove_last_line(down)
+            
             ds_single_CTD = make_xarray_with_attributes(down, metadata, this_stat)
-            if is_string_in_filenames(
-                path_intermediate_files_netcdf, this_stat["Name"]
-            ):
+            dfSelectedStationInfo = pd.concat([dfSelectedStationInfo, this_stat], axis=1)
+            if is_string_in_filenames(path_intermediate_files_netcdf, this_stat["Name"]):
                 print(f"{this_stat['Name']} already converted to netcdf")
             elif check_figure:            
                 interactive_plot = InteractivePlot(ds_single_CTD)
@@ -478,7 +529,7 @@ if __name__ == "__main__":
             # check of str is in list
 
 
-            list_of_all_stations.append(
+            list_of_ds_all_stations.append(
                 ds_single_CTD.assign_coords(
                     time=ds_single_CTD.attrs["time_coverage_start"],
                     latitude=ds_single_CTD.attrs["geospatial_lat_min"],
@@ -486,9 +537,18 @@ if __name__ == "__main__":
                     station=ds_single_CTD.attrs["GCRC_station_number"],
                 )
             )
-
-    combined = xr.concat(list_of_all_stations, dim="station")
+    dfSelectedStationInfo.transpose().to_csv(f"{path_intermediate_files}/CTD_selected_stations_info.csv")
+    print(f"Selected station info saved in {path_intermediate_files}/CTD_selected_stations_info.csv")
+    combined = xr.concat(list_of_ds_all_stations, dim="station")
     combined.to_netcdf(f"{path_intermediate_files_netcdf}/CTD_all_stations.nc")
+    print("Combined and saved in combined netcdf")
+    print("Done")
 
 
 # %%
+_, dfStationOverview18 = extract_station_info(path_parent=path_parent, year="2018")
+_, dfStationOverview19 = extract_station_info(path_parent=path_parent, year="2019")
+dfStationOverview = pd.concat([dfStationOverview18, dfStationOverview19])
+dfStationOverview.to_csv(
+    f"{path_intermediate_files_netcdf}/CTD_all_stations_overview.csv"
+)

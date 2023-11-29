@@ -227,7 +227,7 @@ def check_if_var_not_nan(df, var):
         raise ValueError(f"Variable {var} for {df.depth[0]} m contains only NaN values")
 
 
-for i in range(2):
+for i in range(nr_moorings):
     depth = files[i].split("_")[2].split("m.")[0]
     if depth == "5":
         continue
@@ -260,6 +260,8 @@ for i in range(2):
     dsSingleMooring["depth"].attrs = {"long_name": "Planned depth of instrument", "units": "m"}
     dsSingleMooring["days_julian"].attrs = {"long_name": "Time in julian days since start of specific year", "units": f"days since {StartTimeJulianDays}"}
     dsSingleMooring["date"].attrs = {"long_name": "Date in datetime format, rounded to 1 min"}
+    dsSingleMooring["pressure"].attrs = {"long_name": "Pressure", "units": "dbar"}
+    dsSingleMooring["flag"].attrs = {"long_name": "Flagged measurements, True if measurement is classified as outlier, either because of being too close to the ocean surface or 3 std from the mean"}
     
     # More attributes for single mooring
     global_attributes = define_global_attributes(metadata)
@@ -286,31 +288,17 @@ attributes_combined_moorings = {
     "time_coverage_end" : latest_date,
     "time_coverage_start" : earliest_date,
     "title": f"{global_attributes['data_type']} {global_attributes['featureType']} at Station GF10 on from {earliest_date}-{latest_date}, for depths {dsAllMoorings.id.to_numpy()} m in Nuup Kangerlua, Greenland",
-    "summary": f"The file contains potential temperature, practical salinity and depth measurements every 10 minutes at depths {dsAllMoorings.id.to_numpy()} m  at station GF10. The raw data was measured at {metadata['Latitude']:.3f}N, {metadata['Longitude']:.3f}E, with a {global_attributes['instrument']}. The data was collected by the Greenland Climate Research Center (GCRC)",
+    "summary": f"The file contains potential temperature, practical salinity and depth measurements every 10 minutes at depths {dsAllMoorings.id.to_numpy()} m  at station GF10. The raw data was measured at {metadata['Latitude']:.3f}N, {metadata['Longitude']:.3f}E, with a {global_attributes['instrument']}. The data was collected by the Greenland Climate Research Center (GCRC). ID is planned mooring depth of specific instrument. Flagged for outliers (bad ='True')",
     }
-
 
 dsAllMoorings= dsAllMoorings.assign_attrs(global_attributes)
 dsAllMoorings= dsAllMoorings.assign_attrs(attributes_combined_moorings)
-_, dfStationOverview = extract_station_info(path_parent=path_parent, year="2018")
-dfMooringOverview =  dfStationOverview[dfStationOverview.Type == "MOR"]
 
 
+depth_string = f"{dsAllMoorings.id.to_numpy()}".replace(" ", "_").replace("[", "").replace("]","")
 
-# all_moorings.to_csv(f"{path_parent.joinpath('Processing')}/intermediate_files/mooring_gf13.csv")
-
-fCTDprofiles = path_parent.joinpath("data","temp", "monthly_all_years_all_stations.csv")
-if not os.path.exists(fCTDprofiles):
-    dfCTDprofiles = pd.DataFrame()
-    print("File you are trying to open doesn't exist, will continue without. First run CTD_monthly.py if you want to include ctd profiles.")
-else:
-    dfCTDprofiles = pd.read_csv(fCTDprofiles, index_col=0, parse_dates=True)
-all_moorings["id"] = all_moorings["depth"]
-df_combi = pd.concat([dfCTDprofiles, all_moorings])
-
-
-all_moorings["id"] = all_moorings["id"].astype("int")
-dsAllMoorings = all_moorings.set_index(["id", "date"]).to_xarray()
+ncName = f"Mooring_CTD_GCRC_GF10{depth_string}m_{earliest_date[:10]}_{latest_date[:10]}_{metadata['Latitude']:.2f}N_{metadata['Longitude']:.2f}E.nc"
+dsAllMoorings.to_netcdf(f"{path_parent.joinpath('data', 'temp', 'netcdf', ncName)}")
 
 
 for var in ["temp_pot", "sal_prac", "dens", "temp_insitu", "cond"]:

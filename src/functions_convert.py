@@ -61,9 +61,9 @@ def split_header(header):
                     key, value = subline.split("=")
                 except ValueError:
                     split_subline_with_multiple_equal_signs(subline)
-                key = key.strip().strip("<")
+                key = key.strip()
                 value = (
-                    value.strip().strip("/>")
+                    value.strip()
                 )  # Remove leading/trailing whitespaces from the value
                 if "* " in key:
                     key = key.split("* ")[1]
