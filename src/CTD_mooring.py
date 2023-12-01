@@ -20,6 +20,8 @@ import xarray as xr
 from CTD_monthly import extract_station_info
 
 
+
+
 importlib.reload(func)
 
 
@@ -60,6 +62,11 @@ dfMooringOverview = pd.concat([dfMooringOverview18, dfMooringOverview19])
 
 def open_cnv(fname, remove_5m=True):
     """Open cnv file and export dataframe down and metadata and cast"""
+    def read_first_line(fname):
+        with open(fname, 'r', encoding='ISO-8859-1') as f:
+            first_line = f.readline()
+        return first_line
+
     cast = ctd.from_cnv(fname)  #
     metadata = cast._metadata
     metadata["config_original"] = metadata["config"]
@@ -67,7 +74,8 @@ def open_cnv(fname, remove_5m=True):
     metadata["header"] = func.split_header(metadata["header"])
     metadata["config"] = func.split_header(metadata["config"])
     metadata["StatNumber"] = metadata["name"].split("SBE")[1][:4]
-
+    metadata["Instrument"] = read_first_line(fname).strip("*").split("Data")[0].strip()
+    
     for stat in dfMooringOverview.index:
         if metadata["StatNumber"] in dfMooringOverview.loc[stat, "Comments"]:
             for col in dfMooringOverview.columns:
@@ -136,23 +144,6 @@ def remove_outliers_5m(cast, nr_per_hour=6):
         return cast
 
 
-def remove_outliers(cast, nr_per_hour=6):
-    """Removes outliers based on temp and sal by finding a x times std over 4 weeks
-    nr_per_hour  = nr obs per hour, default every 10 min, is 6 times per hour"""
-    df5 = cast[["temp", "sal"]]
-    window = nr_per_hour * 24 * 28  # 4 weeks
-    max_z = 3  # max std dev
-    z_scores_alt = (
-        df5 - df5.rolling(window, center=True, min_periods=window // 2).mean()
-    ) / df5.rolling(window, center=True, min_periods=window // 2).std()
-    abs_z_scores = z_scores_alt.abs()
-    filtered_entries = (abs_z_scores < max_z).all(axis=1)
-    new_df = df5[filtered_entries]
-    print(
-        f"{len(df5) - len(new_df)} values flagged, {(len(df5) - len(new_df))/len(new_df):.3f} %"
-    )
-    cast.loc[filtered_entries, "flag"] = True
-    return cast
 
 
 def time_to_date(fname, cast, start_time="Jan 1 2018"):
@@ -179,7 +170,6 @@ def define_global_attributes(metadata):
     global_attributes = {
         "data_type": "CTD",
         "featureType": "timeseries",
-        "instrument": "Sea-Bird SBE37SM-RS232",
         "keyword_vocabulary": "GCMD Science Keywords",
         "keywords": "EARTH SCIENCE>OCEANS>OCEAN TEMPERATURE>WATER TEMPERATURE, EARTH SCIENCE>OCEANS>OCEAN PRESSURE>WATER PRESSURE,EARTH SCIENCE>OCEANS>SALINITY/DENSITY>SALINITY",
         "Conventions": "ACDD-1.3",
@@ -251,6 +241,12 @@ for i in range(nr_moorings):
     cast = cast.set_index(["id", "date"])
     dsSingleMooring = cast.drop(columns=["index", "timedelta"]).to_xarray()
 
+    print(f"\nMean pressure: {cast.pressure.mean():.0f} dbar, std: {cast.pressure.std():.2f} dbar")
+    print(f"Mean time interval: {cast.days_julian.diff().mean()*24*60*60:.0f} s")
+    print(f"Instrument used is {metadata['Instrument']}")
+    start_time_depth_str, end_time_depth_str = StartTimeInstrument.strftime("%Y-%m-%dT%H:%MZ"),cast.reset_index().date.max().strftime("%Y-%m-%dT%H:%MZ")
+    print(f"Measured between {start_time_depth_str} and {end_time_depth_str}\n")
+
     #set attributes    
     dsSingleMooring["temp_pot"].attrs = {"long_name": "Potential temperature", "units": "degree C"}
     dsSingleMooring["temp_insitu"].attrs = {"long_name": "In situ temperature as measured ", "units": "degree C"}
@@ -261,17 +257,18 @@ for i in range(nr_moorings):
     dsSingleMooring["days_julian"].attrs = {"long_name": "Time in julian days since start of specific year", "units": f"days since {StartTimeJulianDays}"}
     dsSingleMooring["date"].attrs = {"long_name": "Date in datetime format, rounded to 1 min"}
     dsSingleMooring["pressure"].attrs = {"long_name": "Pressure", "units": "dbar"}
-    dsSingleMooring["flag"].attrs = {"long_name": "Flagged measurements, True if measurement is classified as outlier, either because of being too close to the ocean surface or 3 std from the mean"}
+    dsSingleMooring["flag"].attrs = {"long_name": F"lagged measurements, True if measurement is classified as outlier, either because of being too close to the ocean surface or 3 std from the mean"}
     
     # More attributes for single mooring
     global_attributes = define_global_attributes(metadata)
     dsSingleMooring = dsSingleMooring.assign_attrs({
+        "instrument": metadata['Instrument'],
         "geospatial_vertical_min": cast.pressure.max(),
         "geospatial_vertical_max": cast.pressure.min(),
-        "time_coverage_start" :StartTimeInstrument.strftime("%Y-%m-%dT%H:%MZ"),
-        "time_coverage_end" : cast.reset_index().date.max().strftime("%Y-%m-%dT%H:%MZ"),
-        "title" : f"{global_attributes['data_type']} {global_attributes['featureType']} at Station GF10 on from {StartTimeInstrument.strftime('%Y-%m-%dT%H:%MZ'),}-{cast.reset_index().date.max().strftime('%Y-%m-%dT%H:%MZ')}, for an approximate depth of {depth} m in Nuup Kangerlua, Greenland",         
-        "summary": f"The file contains potential temperature, practical salinity and depth measurements every 10 minutes at depth {depth} m  at station GF10. The raw data was measured at {metadata['Latitude']:.3f}N, {metadata['Longitude']:.3f}E, with a {global_attributes['instrument']}. The data was collected by the Greenland Climate Research Center (GCRC)",
+        "time_coverage_start" : start_time_depth_str,
+        "time_coverage_end" : end_time_depth_str,
+        "title" : f"{global_attributes['data_type']} {global_attributes['featureType']} at Station GF10 on between{start_time_depth_str} and {end_time_depth_str}, for an approximate depth of {depth} m in Nuup Kangerlua, Greenland",         
+        "summary": f"The file contains potential temperature, practical salinity and depth measurements every 10 minutes at depth {depth} m  at station GF10. The raw data was measured at {metadata['Latitude']:.3f}N, {metadata['Longitude']:.3f}E, with a Sea-Bird SBE37SM. The data was collected by the Greenland Climate Research Center (GCRC)",
     })
     dsSingleMooring.attrs = {**dsSingleMooring.attrs, **global_attributes}    
     ncName = f"Mooring_CTD_GCRC_GF10_{depth}m_{StartTimeInstrument.strftime('%Y-%m-%d')}_{cast.reset_index().date.max().strftime('%Y-%m-%d')}_{metadata['Latitude']:.2f}N_{metadata['Longitude']:.2f}E.nc"
@@ -287,8 +284,8 @@ earliest_date = pd.to_datetime(dsAllMoorings.date).min().strftime("%Y-%m-%dT%H:%
 attributes_combined_moorings = {
     "time_coverage_end" : latest_date,
     "time_coverage_start" : earliest_date,
-    "title": f"{global_attributes['data_type']} {global_attributes['featureType']} at Station GF10 on from {earliest_date}-{latest_date}, for depths {dsAllMoorings.id.to_numpy()} m in Nuup Kangerlua, Greenland",
-    "summary": f"The file contains potential temperature, practical salinity and depth measurements every 10 minutes at depths {dsAllMoorings.id.to_numpy()} m  at station GF10. The raw data was measured at {metadata['Latitude']:.3f}N, {metadata['Longitude']:.3f}E, with a {global_attributes['instrument']}. The data was collected by the Greenland Climate Research Center (GCRC). ID is planned mooring depth of specific instrument. Flagged for outliers (bad ='True')",
+    "title": f"{global_attributes['data_type']} {global_attributes['featureType']} at Station GF10 on between {earliest_date} and {latest_date}, for depths {dsAllMoorings.id.to_numpy()} m in Nuup Kangerlua, Greenland",
+    "summary": f"The file contains potential temperature, practical salinity and depth measurements every 10 minutes at depths {dsAllMoorings.id.to_numpy()} m  at station GF10. The raw data was measured at {metadata['Latitude']:.3f}N, {metadata['Longitude']:.3f}E, with a Sea-Bird SBE37. The data was collected by the Greenland Climate Research Center (GCRC). ID is planned mooring depth of specific instrument. Flagged for outliers (bad ='True')",
     }
 
 dsAllMoorings= dsAllMoorings.assign_attrs(global_attributes)
@@ -301,16 +298,16 @@ ncName = f"Mooring_CTD_GCRC_GF10{depth_string}m_{earliest_date[:10]}_{latest_dat
 dsAllMoorings.to_netcdf(f"{path_parent.joinpath('data', 'temp', 'netcdf', ncName)}")
 
 
-for var in ["temp_pot", "sal_prac", "dens", "temp_insitu", "cond"]:
-    dsAllMoorings[var].plot.line(x='date')
-    plt.show()
+print("Done")
+print(attributes_combined_moorings["summary"])
+print(attributes_combined_moorings["title"])
 
+plotting = False
+if plotting is True:
+    for var in ["temp_pot", "sal_prac", "dens", "temp_insitu", "cond"]:
+        dsAllMoorings[var].plot.line(x='date')
+        plt.show()
 
-
-
-# %%
-
-# round dsAllMoorings.date to 1 min
 
 
 

@@ -1,4 +1,4 @@
-name: deep_water
+name: convert_ctd
 channels: 
   - conda-forge
 dependencies:
