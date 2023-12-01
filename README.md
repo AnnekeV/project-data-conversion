@@ -6,16 +6,17 @@ The goal of this project is to convert CTD profiles into seperate and a combined
 
 
 ## Dependencies
-Made on a MacOs
-python
-in requirements.yml
-install dependencies in a virtual environment
-`code here`
-
+Made on a MacOs with Python3
+1. Fork this repository
+2. Use conda or install conda following [these instructions](https://docs.conda.io/projects/miniconda/en/latest/miniconda-install.html) .
+3. Install dependencies through requirements.yml in a new virtual environment
 ```python
 conda env create -f requirements.yml
 ```
-
+4. Activate the new environment
+```python
+conda activate convert_ctd
+```
 
 
 ## Usage
@@ -24,7 +25,8 @@ You should be able to use python and know how virtual environments work
 `conda activate deep_water`
 
 1. Put CTD data in `data/raw`
-2. Run `ctd_monthly.py`
+2. Run `ctd_monthly.py`, `CTD_mooring.py`
+3. In docs/notebook open notebook and inspect data
 
 ## Project Structure
 
@@ -43,13 +45,14 @@ The project structure distinguishes three kinds of folders:
 ├── data               <- All project data, ignored by git
 │   ├── processed      <- The final, canonical data sets for modeling. (PG)
 │   ├── raw            <- The original, immutable data dump. (RO)
-│   └── temp           <- Intermediate data that has been transformed. (PG)
+│   └── temp           <- Intermediate data that has been transformed, including overview files (PG)
+│       └── CTD        <- Intermediate CTD profiles that have been transformed (PG)
+│       └── Mooring    <- Intermediate CTD profiles that have been transformed (PG)
+│       └── ADCP       <- Intermediate CTD profiles that have been transformed (PG)
 ├── docs               <- Documentation notebook for users (HW)
-│   ├── manuscript     <- Manuscript source, e.g., LaTeX, Markdown, etc. (HW)
-│   └── reports        <- Other project reports and notebooks (e.g. Jupyter, .Rmd) (HW)
-├── results
-│   ├── figures        <- Figures for the manuscript or reports (PG)
-│   └── output         <- Other output for the manuscript or reports (PG)
+│   └── notebooks      <- IPython jupyter notebooks, to view data and get some basic characteristics (HW)
+├── img
+│   └── figures        <- Figures for the ReadMe or  (PG)
 └── src                <- Source code for this project (HW)
 
 ```
