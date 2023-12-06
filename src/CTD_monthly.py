@@ -464,6 +464,14 @@ Mouth = {"name": "Mouth", "latitude_min": 63.95, "latitude_max": 64.15, "longitu
 listDoNotIncludeTheseStations= np.concatenate((Puattorfik_st, Uuummannap_Sullua_st, Sulussugutip_Kgl_st, Kapsillit_st, KangersuneqGF12NorthSide_st, GF10NorthSide_st, OtherNorthWestSide_st))
 areas_not_include = [Puattorfik, Uuummannap_Sullua, KangersuneqGF12NorthSide, GF10NorthSide, GF3, Mouth]
 
+fname_selected_stations_by_lorenz = "/Users/annek/Library/CloudStorage/OneDrive-SharedLibraries-NIOZ/project-data-conversion/data/temp/selected_station_list.txt"
+
+# Open the file and read the lines
+with open(fname_selected_stations_by_lorenz, 'r') as file:
+    selected_stations = file.readlines()
+selected_stations = [station.strip() for station in selected_stations]
+listDoNotIncludeTheseStations = np.concatenate((listDoNotIncludeTheseStations, selected_stations))
+
 def check_if_excluded(this_stat, list_donot_include=None, areas_not_include=None):
     ''' 
     Check if the station should be excluded from the processing
@@ -552,3 +560,4 @@ dfStationOverview = pd.concat([dfStationOverview18, dfStationOverview19])
 dfStationOverview.to_csv(
     f"{path_intermediate_files_netcdf}/CTD_all_stations_overview.csv"
 )
+# %%

@@ -164,9 +164,14 @@ def nearest(items, pivot):
 # %%
 
 # define global atttributes
-def define_global_attributes(metadata):
+def define_global_attributes(metadata=None):
     datenow_utc = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
     user_name = "Anneke Vries"
+    if metadata is None:
+        metadata = {
+            "Latitude": 64.61238333333333,
+            "Longitude": -50.954233333333335
+        }
     global_attributes = {
         "data_type": "CTD",
         "featureType": "timeseries",
@@ -182,7 +187,7 @@ def define_global_attributes(metadata):
         "creator_name": user_name,
         "creator_email": "anneke.vries@nioz.nl",
         "creator_url": "https://orcid.org/0000-0001-9970-1189",
-        "project": "UU-NIOZ Greenland fjords as gateways between the ice sheet and the ocean",
+        "project": "NIOZ-UU Greenland fjords as gateways between the ice sheet and the ocean",
         "platform": "mooring",
         "license": "https://creativecommons.org/licenses/by/4.0/",
         "iso_topic_category": "oceans",
@@ -192,6 +197,7 @@ def define_global_attributes(metadata):
         "geospatial_lon_max": metadata["Longitude"],
         "source": "Mooring with CTD at GF10",
         "GCRC_standard_station": "GF10",
+        "Bottom depth": "560 m",
     }
     return global_attributes
 
