@@ -103,6 +103,8 @@ def extract_CTD(fname, stat):
             "potemp090C": "Potential temperature",
             "sal00": "Salinity",
             "density00": "Density",
+            "tv290C": "Temperature",
+            "c0S/m": "Conductivity",
         }
     )
     metadata = cast._metadata
@@ -157,7 +159,7 @@ def make_xarray_with_attributes(down, metadata, this_stat):
     """
 
     ds_single = down.set_index("Pressure [dbar]").to_xarray()
-    ds_single = ds_single[["Potential temperature", "Salinity", "Density"]]
+    ds_single = ds_single[["Potential temperature", "Salinity", "Density", "Temperature", "Conductivity"]]
     #  set units, standard_name, long_name
     ds_single["Potential temperature"].attrs["units"] = "degree C"
     ds_single["Potential temperature"].attrs[
@@ -172,6 +174,16 @@ def make_xarray_with_attributes(down, metadata, this_stat):
     ds_single["Density"].attrs["units"] = "kg/m3"
     ds_single["Density"].attrs["standard_name"] = "sea_water_density"
     ds_single["Density"].attrs["long_name"] = "Density of sea water"
+    ds_single["Pressure [dbar]"].attrs["units"] = "dbar"
+    ds_single["Pressure [dbar]"].attrs["standard_name"] = "sea_water_pressure"
+    ds_single["Pressure [dbar]"].attrs["long_name"] = "Pressure of sea water"
+    ds_single["Temperature"].attrs["units"] = "degree C"
+    ds_single["Temperature"].attrs["standard_name"] = "sea_water_temperature"
+    ds_single["Temperature"].attrs["long_name"] = "In situ temperature of sea water"
+    ds_single["Conductivity"].attrs["units"] = "S/m"
+    ds_single["Conductivity"].attrs["standard_name"] = "sea_water_electrical_conductivity"
+    ds_single["Conductivity"].attrs["long_name"] = "Electrical conductivity of sea water"
+
 
     # even more generic
     user_name = "Anneke Vries"
@@ -220,9 +232,10 @@ def make_xarray_with_attributes(down, metadata, this_stat):
     geospatial_lon_max = longitude
     source = f"{data_type} #{GCRC_station_number}"
     GCRC_standard_station = this_stat["St."]
+    date_taken = str(this_stat["Date"])[:10]
 
-    title = f"{data_type} {featureType} {this_stat['Name']} on {this_stat['Date']}, in Nuup Kangerlua, Greenland"
-    summary = f"The file contains potential temperature, practical salinity and depth measurements binned into 1 db bins. The raw data was measured at {latitude:.3f}N, {longitude:.3f}E, on {this_stat['Date']} UTC , with a {instrument}. The data was collected by the Greenland Climate Research Center (GCRC)"
+    title = f"{data_type} {featureType} {this_stat['Name']} on {date_taken}, in Nuup Kangerlua, Greenland"
+    summary = f"The file contains potential temperature, practical salinity and depth measurements binned into 1 db bins. The raw data was measured at {latitude:.3f}N, {longitude:.3f}E, on {time_coverage_start} UTC , with a {instrument}. The data was collected by the Greenland Climate Research Center (GCRC)"
 
     attributes_to_be_included = [
         "user_name",
@@ -388,11 +401,12 @@ def save_dsCTD_to_netcdf(ds_single_CTD, path_intermediate_files_netcdf):
     path_intermediate_files_netcdf : string
         path to the intermediate files
     """
-    print(path_intermediate_files_netcdf)
-
+    fname = f"{path_intermediate_files_netcdf}/single_profiles/CTD_{ds_single_CTD.attrs['GCRC_station_number']}_{ds_single_CTD.attrs['time_coverage_start'].split('T')[0]}_{ds_single_CTD.attrs['geospatial_lat_min']:.2f}N_{ds_single_CTD.attrs['geospatial_lon_min']:.2f}E.nc"
+    print(fname)
+    
     # Save to netcdf
     ds_single_CTD.to_netcdf(
-        f"{path_intermediate_files_netcdf}/CTD_{ds_single_CTD.attrs['GCRC_station_number']}_{ds_single_CTD.attrs['time_coverage_start'].split('T')[0]}_{ds_single_CTD.attrs['geospatial_lat_min']:.2f}N_{ds_single_CTD.attrs['geospatial_lon_min']:.2f}E.nc"
+       fname
     )
 
 
@@ -553,11 +567,11 @@ if __name__ == "__main__":
     print("Done")
 
 
-# %%
-_, dfStationOverview18 = extract_station_info(path_parent=path_parent, year="2018")
-_, dfStationOverview19 = extract_station_info(path_parent=path_parent, year="2019")
-dfStationOverview = pd.concat([dfStationOverview18, dfStationOverview19])
-dfStationOverview.to_csv(
-    f"{path_intermediate_files_netcdf}/CTD_all_stations_overview.csv"
-)
+# # %%
+# _, dfStationOverview18 = extract_station_info(path_parent=path_parent, year="2018")
+# _, dfStationOverview19 = extract_station_info(path_parent=path_parent, year="2019")
+# dfStationOverview = pd.concat([dfStationOverview18, dfStationOverview19])
+# dfStationOverview.to_csv(
+#     f"{path_intermediate_files_netcdf}/CTD_all_stations_overview.csv"
+# )
 # %%

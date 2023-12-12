@@ -81,11 +81,11 @@ def open_cnv(fname, remove_5m=True):
             for col in dfMooringOverview.columns:
                 metadata[col] = dfMooringOverview.loc[stat, col]
 
-    cast = rename_variables(cast, remove_5m)
+    cast = rename_variables(cast)
     return cast, metadata
 
 
-def rename_variables(df, remove_5m):
+def rename_variables(df):
     """renames the variables as in cnv to shorter and equal names  AND REMOVES OUTLIERS"""
     df = df.rename(
         columns={
@@ -105,9 +105,6 @@ def rename_variables(df, remove_5m):
     )
     df = df.reset_index()
     df = remove_above_zero(df)
-    if remove_5m:
-        df = remove_outliers_5m(df)
-        df = remove_outliers_5m(df)  # twice for the best result
 
     return df
 
@@ -119,29 +116,6 @@ def remove_above_zero(cast):
     print(f"Nr. rows above water surface (dbar<0.15): {cast.flag.sum()}")
     # cast = cast.set_index("Pressure [dbar]")
     return cast
-
-
-def remove_outliers_5m(cast, nr_per_hour=6):
-    """Removes outliers based on temp and sal by finding a x times std over 4 weeks
-    nr_per_hour  = nr obs per hour, default every 10 min, is 6 times per hour,
-    with built in safety so you don't do it for other depth than 5 m"""
-    if cast["Pressure [dbar]"].mean() < 10:
-        df5 = cast[["temp_insitu", "sal_prac"]]
-        window = nr_per_hour * 24 * 28  # 4 weeks
-        max_z = 3  # max std dev
-        z_scores_alt = (
-            df5 - df5.rolling(window, center=True, min_periods=window // 2).mean()
-        ) / df5.rolling(window, center=True, min_periods=window // 2).std()
-        abs_z_scores = z_scores_alt.abs()
-        filtered_entries = (abs_z_scores < max_z).all(axis=1)
-        new_df = df5[filtered_entries]
-        print(
-            f"{len(df5) - len(new_df)} values removed, {(len(df5) - len(new_df))/len(new_df):.3f} %"
-        )
-        cast.loc[filtered_entries, "flag"] = True
-        return cast
-    else:
-        return cast
 
 
 
@@ -254,16 +228,16 @@ for i in range(nr_moorings):
     print(f"Measured between {start_time_depth_str} and {end_time_depth_str}\n")
 
     #set attributes    
-    dsSingleMooring["temp_pot"].attrs = {"long_name": "Potential temperature", "units": "degree C"}
-    dsSingleMooring["temp_insitu"].attrs = {"long_name": "In situ temperature as measured ", "units": "degree C"}
-    dsSingleMooring["sal_prac"].attrs = {"long_name": "Practical salinity", "units": "PSU"}
-    dsSingleMooring["dens"].attrs = {"long_name": "Density", "units": "kg/m3"}
-    dsSingleMooring["cond"].attrs = {"long_name": "Conductivity as measured", "units": "S/m"}
-    dsSingleMooring["depth"].attrs = {"long_name": "Planned depth of instrument", "units": "m"}
-    dsSingleMooring["days_julian"].attrs = {"long_name": "Time in julian days since start of specific year", "units": f"days since {StartTimeJulianDays}"}
-    dsSingleMooring["date"].attrs = {"long_name": "Date in datetime format, rounded to 1 min"}
-    dsSingleMooring["pressure"].attrs = {"long_name": "Pressure", "units": "dbar"}
-    dsSingleMooring["flag"].attrs = {"long_name": F"lagged measurements, True if measurement is classified as outlier, either because of being too close to the ocean surface or 3 std from the mean"}
+    dsSingleMooring["temp_pot"].attrs = {"long_name": "Potential temperature", "units": "degree C", "short_name": r"$\theta$ [$^o$C]"}
+    dsSingleMooring["temp_insitu"].attrs = {"long_name": "In situ temperature as measured ", "units": "degree C", "short_name": r"$T$ [$^o$C]"}
+    dsSingleMooring["sal_prac"].attrs = {"long_name": "Practical salinity", "units": "PSU", "short_name": r"$S$ [PSU]"}
+    dsSingleMooring["dens"].attrs = {"long_name": "Density", "units": "kg/m3", "short_name": r"$\rho$ [kg m$^{-3}$]"}
+    dsSingleMooring["cond"].attrs = {"long_name": "Conductivity as measured", "units": "S/m", "short_name": r"cond [S m$^{-1}$]"}
+    dsSingleMooring["depth"].attrs = {"long_name": "Planned depth of instrument", "units": "m", "short_name": r"z [m]"}
+    dsSingleMooring["days_julian"].attrs = {"long_name": "Time in julian days since start of specific year", "units": f"days since {StartTimeJulianDays}", "short_name": r"t [days]"}
+    dsSingleMooring["date"].attrs = {"long_name": "Date in datetime format, rounded to 1 min",}
+    dsSingleMooring["pressure"].attrs = {"long_name": "Pressure", "units": "dbar", "short_name": r"p [dbar]"}
+    dsSingleMooring["flag"].attrs = {"long_name": f"Flagged measurements, 1 if measurement is classified as outlier, because of being too close to the ocean surface (<0.15 dBar)"}
     
     # More attributes for single mooring
     global_attributes = define_global_attributes(metadata)
@@ -308,10 +282,19 @@ print("Done")
 print(attributes_combined_moorings["summary"])
 print(attributes_combined_moorings["title"])
 
-plotting = False
+plotting = True
+
+plt.style.use('seaborn-ticks')
 if plotting is True:
     for var in ["temp_pot", "sal_prac", "dens", "temp_insitu", "cond"]:
-        dsAllMoorings[var].plot.line(x='date')
+        fig, ax = plt.subplots(figsize=(8, 4))
+        dsAllMoorings[var].rename({'id': 'Mounting\ndepth[m]'}).plot.scatter(x='date', s=1, zorder=1, color = 'k', alpha = 0.5)
+        # plot rolling mean
+        dsAllMoorings[var].rename({'id': 'Mounting\ndepth[m]'}).rolling(date=int(25*6), center=True).mean().plot.line(x='date', zorder=2)
+        plt.xlabel("")
+        plt.ylabel(dsAllMoorings[var].short_name)
+        plt.title(dsAllMoorings[var].long_name)
+        plt.xlim(dsAllMoorings.date.min(), dsAllMoorings.date.max())
         plt.show()
 
 
